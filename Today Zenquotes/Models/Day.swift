@@ -32,73 +32,15 @@
 
 import Foundation
 
-func sampleContent() -> String {
-    guard let path = Bundle.main.path(
-        forResource: "SampleData",
-        ofType: "json"
-    ) else { return "" }
-    do {
-        return try String(contentsOfFile: path, encoding: .utf8)
-    } catch {
-        print(error)
-        return ""
-    }
-}
+struct Day: Decodable {
+  let date: String
+  let data: [String: [Event]]
 
-func sampleData() -> Data? {
-    guard let path = Bundle.main.path(
-        forResource: "SampleData",
-        ofType: "json"
-    ) else { return nil }
-    do {
-        return try Data(contentsOf: URL(fileURLWithPath: path))
-    } catch {
-        print(error)
-        return nil
-    }
-}
+  var events: [Event] { data[EventType.events.rawValue] ?? [] }
+  var births: [Event] { data[EventType.births.rawValue] ?? [] }
+  var deaths: [Event] { data[EventType.deaths.rawValue] ?? [] }
 
-public func sampleFileURL() -> URL? {
-    do {
-        let downloadsFolder = try FileManager.default.url(
-            for: .downloadsDirectory,
-            in: .userDomainMask,
-            appropriateFor: nil,
-            create: true
-        )
-        
-        return downloadsFolder.appendingPathComponent("SampleData.json")
-    } catch {
-        print(error)
-        return nil
-    }
-}
-
-public func saveSampleData(json: String) {
-  guard let jsonFile = sampleFileURL() else {
-    print("Error getting URL of sample data file.")
-    return
-  }
-
-  do {
-    try json.write(to: jsonFile, atomically: true, encoding: .utf8)
-    print("Sample JSON data saved to \(jsonFile.path)")
-  } catch {
-    print(error)
-  }
-}
-
-public func readSampleData() -> Data? {
-  guard let jsonFile = sampleFileURL() else {
-    print("Error getting URL of sample data file.")
-    return nil
-  }
-
-  do {
-    let data = try Data(contentsOf: jsonFile)
-    return data
-  } catch {
-    print(error)
-    return nil
+  var displayDate: String {
+    date.replacingOccurrences(of: "_", with: " ")
   }
 }
