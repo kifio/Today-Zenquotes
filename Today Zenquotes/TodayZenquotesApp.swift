@@ -28,11 +28,17 @@ struct TodayZenquotesApp: App {
     }
 }
 
+enum ViewMode: Int {
+    case grid
+    case table
+}
+
 struct ContentView: View {
     
     @EnvironmentObject var appState: AppState
-    @State private var searchText = ""
-    @State private var eventType: EventType? = .events
+    @SceneStorage("searchText") var searchText = ""
+    @SceneStorage("eventType") var eventType: EventType?
+    @SceneStorage("viewMode") var viewMode: ViewMode = .grid
     
     var events: [Event] {
         appState.dataFor(eventType: eventType, searchText: searchText)
@@ -49,7 +55,11 @@ struct ContentView: View {
     var body: some View {
         NavigationView {
             SidebarView(selection: $eventType)
-            GridView(gridData: events)
+            if viewMode == .grid {
+                GridView(gridData: events)
+            } else {
+                TableView(tableData: events)
+            }
         }
         .frame(
             minWidth: 700,
@@ -60,8 +70,13 @@ struct ContentView: View {
             maxHeight: .infinity
         )
         .navigationTitle(windowTitle)
-        .toolbar(id: "mainToolbar") { Toolbar() }
+        .toolbar(id: "mainToolbar") { Toolbar(viewMode: $viewMode) }
         .searchable(text: $searchText)
+        .onAppear {
+            if eventType == nil {
+                eventType = .events
+            }
+        }
     }
 }
 
@@ -188,6 +203,9 @@ struct Menus: Commands {
 }
 
 struct Toolbar: CustomizableToolbarContent {
+    
+    @Binding var viewMode: ViewMode
+    
     var body: some CustomizableToolbarContent {
         ToolbarItem(
             id: "toggleSidebar",
@@ -201,6 +219,17 @@ struct Toolbar: CustomizableToolbarContent {
             }
             .help("Toggle Sidebar")
         }
+        
+        ToolbarItem(id: "viewMode") {
+            Picker("View Mode", selection: $viewMode) {
+                Label("Grid", systemImage: "square.grid.3x2")
+                    .tag(ViewMode.grid)
+                Label("Table", systemImage: "tablecells")
+                    .tag(ViewMode.table)
+            }
+            .pickerStyle(.segmented)
+            .help("Switch between Grid and Table")
+        }
     }
     
     func toggleSidebar() {
@@ -210,6 +239,57 @@ struct Toolbar: CustomizableToolbarContent {
                 #selector(NSSplitViewController.toggleSidebar(_:)),
                 with: nil
             )
+    }
+}
+
+struct TableView: View {
+    
+    var tableData: [Event]
+    
+    var sortedTableData: [Event] {
+        tableData.sorted(using: sortOrder)
+    }
+    
+    var selectedEvent: Event? {
+        guard let selectedEventID else {
+            return nil
+        }
+        
+        let event = tableData.first {
+            $0.id == selectedEventID
+        }
+        
+        return event
+    }
+    
+    @State private var selectedEventID: UUID?
+    @State private var sortOrder = [KeyPathComparator(\Event.year)]
+    
+    var body: some View {
+        HStack {
+            Table(sortedTableData, selection: $selectedEventID, sortOrder: $sortOrder) {
+                TableColumn("Year", value: \.year) {
+                    Text($0.year)
+                }
+                .width(min: 50, ideal: 60, max: 100)
+                
+                TableColumn("Title", value: \.text) {
+                    Text($0.text)
+                }
+            }
+            
+            if let selectedEvent {
+                EventView(event: selectedEvent)
+                    .frame(width: 250)
+            } else {
+                Text("Select an event for more details...")
+                    .font(.title3)
+                    .padding()
+                    .frame(width: 250)
+            }
+        }
+        
+        
     }
 }
 
