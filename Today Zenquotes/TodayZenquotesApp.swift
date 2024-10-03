@@ -39,17 +39,24 @@ struct ContentView: View {
     @SceneStorage("searchText") var searchText = ""
     @SceneStorage("eventType") var eventType: EventType?
     @SceneStorage("viewMode") var viewMode: ViewMode = .grid
+    @SceneStorage("selectDate") var selectedDate: String?
     
     var events: [Event] {
-        appState.dataFor(eventType: eventType, searchText: searchText)
+        appState.dataFor(
+            eventType: eventType,
+            date: selectedDate,
+            searchText: searchText
+        )
     }
     
     var windowTitle: String {
+        let dateTitle = selectedDate ?? "On This Day"
+        
         if let eventType {
-            return "On This Day - \(eventType.rawValue)"
+            return "\(dateTitle) - \(eventType.rawValue)"
         }
         
-        return "On This Day"
+        return dateTitle
     }
     
     var body: some View {
@@ -85,16 +92,51 @@ struct SidebarView: View {
     @Binding var selection: EventType?
     @EnvironmentObject var appState: AppState
     @AppStorage("showTotals") var showTotals = true
+    @SceneStorage("selectDate") var selectedDate: String?
 
     var body: some View {
-        List(selection: $selection) {
-            Section("TODAY") {
-                ForEach(EventType.allCases, id: \.self) { type in
-                    Text(type.rawValue)
-                        .badge(showTotals ? appState.countFor(eventType: type) : 0)
+        VStack {
+            List(selection: $selection) {
+                Section(selectedDate?.uppercased() ?? "TODAY") {
+                    ForEach(EventType.allCases, id: \.self) { type in
+                        Text(type.rawValue)
+                            .badge(showTotals ? appState.countFor(eventType: type, date: selectedDate) : 0)
+                    }
                 }
-            }
-        }.listStyle(.sidebar)
+                
+                Section("AVAILABLE DATES") {
+                    ForEach(appState.sortedDates, id: \.self) { date in
+                        Button {
+                            selectedDate = date
+                        } label: {
+                            HStack {
+                                Text(date)
+                                    .font(.title3)
+                                
+                                Spacer()
+                            }
+                        }
+                        .modifier(DateButtonViewModifier(selected: date == selectedDate))
+                    }
+                }
+            }.listStyle(.sidebar)
+            
+            Spacer()
+            DayPicker()
+        }.frame(minWidth: 220)
+    }
+}
+
+struct DateButtonViewModifier: ViewModifier {
+    var selected: Bool
+    
+    func body(content: Content) -> some View {
+        if selected {
+            content
+                .buttonStyle(.borderedProminent)
+        } else {
+            content
+        }
     }
 }
 
@@ -277,6 +319,7 @@ struct TableView: View {
                     Text($0.text)
                 }
             }
+            .tableStyle(.inset)
             
             if let selectedEvent {
                 EventView(event: selectedEvent)
@@ -290,6 +333,70 @@ struct TableView: View {
         }
         
         
+    }
+}
+
+struct DayPicker: View {
+    @EnvironmentObject var appState: AppState
+    @SceneStorage("selectedDate") var selectedDate: String?
+    
+    @State private var month = "January"
+    @State private var day = 1
+    
+    var maxDays: Int {
+        switch month {
+        case "February":
+            return 29
+        case "April", "June", "September", "November":
+            return 30
+        default:
+            return 31
+        }
+    }
+    
+    var body: some View {
+        VStack {
+            Text("Select a Date")
+            
+            HStack {
+                Picker("", selection: $month) {
+                    ForEach(appState.englishMonthNames, id: \.self) {
+                        Text($0)
+                    }
+                }.pickerStyle(.menu)
+                
+                Picker("", selection: $day) {
+                    ForEach(1 ... maxDays, id: \.self) {
+                        Text("\($0)")
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(maxWidth: 60)
+                .padding(.trailing, 10)
+                
+                if appState.isLoading {
+                    ProgressView()
+                        .frame(height: 28)
+                } else {
+                    Button("Get Events") {
+                        Task {
+                            await getNewEvents()
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                }
+            }
+        }.padding()
+    }
+    
+    func getNewEvents() async {
+        let monthIndex = appState.englishMonthNames
+            .firstIndex(of: month) ?? 0
+        
+        await appState.getDataFor(month: monthIndex + 1, day: day)
+        
+        selectedDate = "\(month) \(day)"
     }
 }
 
