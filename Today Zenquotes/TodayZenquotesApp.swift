@@ -25,6 +25,10 @@ struct TodayZenquotesApp: App {
                     DisplayMode.changeDispalayMode(to: new)
                 }
         }.commands { Menus() }
+        
+        Settings {
+            PreferencesView()
+        }
     }
 }
 
@@ -399,6 +403,15 @@ struct DayPicker: View {
         selectedDate = "\(month) \(day)"
     }
 }
+
+struct PreferencesView: View {
+    var body: some View {
+        Text("Preferences wrapped by AppStorage")
+            .frame(width: 200, height: 150)
+            .navigationTitle("Settings")
+    }
+}
+
 
 extension Font {
     static let justCuriousity = Font.title
